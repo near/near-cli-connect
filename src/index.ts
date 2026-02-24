@@ -1,7 +1,5 @@
 import { KeyPair } from "@near-js/crypto";
-import { FinalExecutionOutcome } from "@near-js/types";
 
-import { NearRpc } from "./rpc";
 import { ConnectorAction } from "./action";
 import { buildAddKeyCommand, buildTransactionCommand, buildSignMessageCommand, Network } from "./commands";
 import {
@@ -45,10 +43,26 @@ async function removeStoredFunctionCallKey(network: string): Promise<void> {
   await storage().remove(`cli:${network}:functionCallKey`);
 }
 
-function getRpc(network: string): NearRpc {
+function getRpcUrl(network: string): string {
   const providers = window.selector?.providers?.[network as "mainnet" | "testnet"];
   const fallback = network === "mainnet" ? "https://rpc.mainnet.fastnear.com" : "https://rpc.testnet.fastnear.com";
-  return new NearRpc(providers && providers.length > 0 ? providers : [fallback]);
+  return providers && providers.length > 0 ? providers[0] : fallback;
+}
+
+async function txStatus(rpcUrl: string, txHash: string, signerId: string): Promise<any> {
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tx",
+      params: { tx_hash: txHash, sender_account_id: signerId, wait_until: "NONE" },
+    }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+  return json.result;
 }
 
 function renderPage(html: string): HTMLElement {
@@ -130,16 +144,11 @@ function parseHashInput(raw: string): string {
   return match ? match[1] : raw;
 }
 
-async function verifyTransaction(
-  rpc: NearRpc,
-  txHash: string,
-  signerId: string,
-  retries = 5,
-): Promise<FinalExecutionOutcome> {
+async function verifyTransaction(rpcUrl: string, txHash: string, signerId: string, retries = 5): Promise<any> {
   let lastError: unknown;
   for (let i = 0; i < retries; i++) {
     try {
-      return await rpc.txStatus(txHash, signerId, "NONE");
+      return await txStatus(rpcUrl, txHash, signerId);
     } catch (err) {
       lastError = err;
       if (i < retries - 1) await new Promise((r) => setTimeout(r, 2000));
@@ -148,11 +157,7 @@ async function verifyTransaction(
   throw lastError ?? new Error(`Transaction ${txHash} not found after ${retries} attempts`);
 }
 
-function promptHashAndVerify(
-  renderHtml: string,
-  rpc: NearRpc,
-  signerId: string,
-): Promise<FinalExecutionOutcome> {
+function promptHashAndVerify(renderHtml: string, rpcUrl: string, signerId: string): Promise<any> {
   return new Promise((resolve) => {
     const root = renderPage(renderHtml);
     setupCopyButtons(root);
@@ -173,7 +178,7 @@ function promptHashAndVerify(
       btn.textContent = "Verifying...";
 
       try {
-        const result = await verifyTransaction(rpc, hash, signerId);
+        const result = await verifyTransaction(rpcUrl, hash, signerId);
         resolve(result);
       } catch {
         showError(root, "Transaction not found. Please check the hash and try again.");
@@ -262,8 +267,8 @@ class NearCliWallet {
         network,
       });
 
-      const rpc = getRpc(network);
-      await promptHashAndVerify(addKeyCommandHtml(command, needsAccountId ? "Step 2 of 2" : undefined), rpc, accountId);
+      const rpcUrl = getRpcUrl(network);
+      await promptHashAndVerify(addKeyCommandHtml(command, needsAccountId ? "Step 2 of 2" : undefined), rpcUrl, accountId);
 
       const fcKey: FunctionCallKey = {
         privateKey: keyPair.toString(),
@@ -324,8 +329,8 @@ class NearCliWallet {
         network,
       });
 
-      const rpc = getRpc(network);
-      await promptHashAndVerify(addKeyCommandHtml(addKeyCmd, `Step ${++currentStep} of ${totalSteps}`), rpc, accountId);
+      const rpcUrl = getRpcUrl(network);
+      await promptHashAndVerify(addKeyCommandHtml(addKeyCmd, `Step ${++currentStep} of ${totalSteps}`), rpcUrl, accountId);
 
       const fcKey: FunctionCallKey = {
         privateKey: keyPair.toString(),
@@ -371,7 +376,7 @@ class NearCliWallet {
     receiverId: string;
     actions: ConnectorAction[];
     network: string;
-  }): Promise<FinalExecutionOutcome> => {
+  }): Promise<any> => {
     const accountId = await getStoredAccountId(network);
     if (!accountId) throw new Error("Wallet not signed in");
 
@@ -383,8 +388,8 @@ class NearCliWallet {
     });
 
     try {
-      const rpc = getRpc(network);
-      return await promptHashAndVerify(transactionCommandHtml(command), rpc, accountId);
+      const rpcUrl = getRpcUrl(network);
+      return await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
     } finally {
       window.selector.ui.hideIframe();
     }
@@ -396,12 +401,12 @@ class NearCliWallet {
   }: {
     transactions: { receiverId: string; actions: ConnectorAction[] }[];
     network: string;
-  }): Promise<FinalExecutionOutcome[]> => {
+  }): Promise<any[]> => {
     const accountId = await getStoredAccountId(network);
     if (!accountId) throw new Error("Wallet not signed in");
 
-    const rpc = getRpc(network);
-    const results: FinalExecutionOutcome[] = [];
+    const rpcUrl = getRpcUrl(network);
+    const results: any[] = [];
 
     try {
       for (const tx of transactions) {
@@ -412,7 +417,7 @@ class NearCliWallet {
           network: network as Network,
         });
 
-        const result = await promptHashAndVerify(transactionCommandHtml(command), rpc, accountId);
+        const result = await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
         results.push(result);
       }
 
