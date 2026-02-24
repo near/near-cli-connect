@@ -7,11 +7,6 @@ import {
   GlobalContractIdentifier,
 } from "@near-js/transactions";
 
-// Fireblocks/near-api-js compatibility imports
-// @ts-ignore - BN.js doesn't have proper ESM types
-import BN from "bn.js";
-import { transactions as nearApiTransactions, utils as nearApiUtils } from "near-api-js";
-
 export interface CreateAccountAction {
   type: "CreateAccount";
 }

@@ -1,10 +1,8 @@
-import { Account, Connection, InMemorySigner } from "near-api-js";
-import { Action } from "@near-js/transactions";
-import { FinalExecutionOutcome } from "@near-js/types";
 import { KeyPair } from "@near-js/crypto";
+import { FinalExecutionOutcome } from "@near-js/types";
 
 import { NearRpc } from "./rpc";
-import { connectorActionsToNearActions, ConnectorAction } from "./action";
+import { ConnectorAction } from "./action";
 import { buildAddKeyCommand, buildTransactionCommand, buildSignMessageCommand, Network } from "./commands";
 import {
   headHtml,
@@ -132,6 +130,24 @@ function parseHashInput(raw: string): string {
   return match ? match[1] : raw;
 }
 
+async function verifyTransaction(
+  rpc: NearRpc,
+  txHash: string,
+  signerId: string,
+  retries = 5,
+): Promise<FinalExecutionOutcome> {
+  let lastError: unknown;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await rpc.txStatus(txHash, signerId, "NONE");
+    } catch (err) {
+      lastError = err;
+      if (i < retries - 1) await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  throw lastError ?? new Error(`Transaction ${txHash} not found after ${retries} attempts`);
+}
+
 function promptHashAndVerify(
   renderHtml: string,
   rpc: NearRpc,
@@ -214,50 +230,6 @@ function promptSignMessageOutput(command: string, step?: string): Promise<SignMe
       }
     });
   });
-}
-
-function storedKeyCanSign(receiverId: string, actions: Action[], fcKey: FunctionCallKey | null): boolean {
-  if (!fcKey || fcKey.contractId !== receiverId) return false;
-  if (actions.length !== 1) return false;
-  const action = actions[0];
-  return !!(
-    action.functionCall &&
-    action.functionCall.deposit.toString() === "0" &&
-    (fcKey.methods.length === 0 || fcKey.methods.includes(action.functionCall.methodName))
-  );
-}
-
-async function signUsingKeyPair(
-  network: string,
-  accountId: string,
-  fcKey: FunctionCallKey,
-  receiverId: string,
-  actions: Action[],
-): Promise<FinalExecutionOutcome> {
-  const keyPair = KeyPair.fromString(fcKey.privateKey as any);
-  const rpc = getRpc(network);
-  const signer = await InMemorySigner.fromKeyPair(network, accountId, keyPair);
-  const connection = new Connection(network, rpc, signer, "");
-  const account = new Account(connection, accountId);
-  return account.signAndSendTransaction({ receiverId, actions });
-}
-
-async function verifyTransaction(
-  rpc: NearRpc,
-  txHash: string,
-  signerId: string,
-  retries = 5,
-): Promise<FinalExecutionOutcome> {
-  let lastError: unknown;
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await rpc.txStatus(txHash, signerId, "NONE");
-    } catch (err) {
-      lastError = err;
-      if (i < retries - 1) await new Promise((r) => setTimeout(r, 2000));
-    }
-  }
-  throw lastError ?? new Error(`Transaction ${txHash} not found after ${retries} attempts`);
 }
 
 class NearCliWallet {
@@ -393,7 +365,7 @@ class NearCliWallet {
 
   signAndSendTransaction = async ({
     receiverId,
-    actions: connectorActions,
+    actions,
     network,
   }: {
     receiverId: string;
@@ -403,21 +375,10 @@ class NearCliWallet {
     const accountId = await getStoredAccountId(network);
     if (!accountId) throw new Error("Wallet not signed in");
 
-    const actions = connectorActionsToNearActions(connectorActions);
-    const fcKey = await getStoredFunctionCallKey(network);
-
-    if (storedKeyCanSign(receiverId, actions, fcKey)) {
-      try {
-        return await signUsingKeyPair(network, accountId, fcKey!, receiverId, actions);
-      } catch (error) {
-        console.warn("Failed to sign using stored key, falling back to CLI", error);
-      }
-    }
-
     const command = buildTransactionCommand({
       signerId: accountId,
       receiverId,
-      actions: connectorActions,
+      actions,
       network: network as Network,
     });
 
@@ -439,23 +400,11 @@ class NearCliWallet {
     const accountId = await getStoredAccountId(network);
     if (!accountId) throw new Error("Wallet not signed in");
 
-    const fcKey = await getStoredFunctionCallKey(network);
     const rpc = getRpc(network);
     const results: FinalExecutionOutcome[] = [];
 
     try {
       for (const tx of transactions) {
-        const actions = connectorActionsToNearActions(tx.actions);
-
-        if (storedKeyCanSign(tx.receiverId, actions, fcKey)) {
-          try {
-            results.push(await signUsingKeyPair(network, accountId, fcKey!, tx.receiverId, actions));
-            continue;
-          } catch (error) {
-            console.warn("Failed to sign using stored key, falling back to CLI", error);
-          }
-        }
-
         const command = buildTransactionCommand({
           signerId: accountId,
           receiverId: tx.receiverId,
