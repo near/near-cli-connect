@@ -4,7 +4,7 @@ A browser-embeddable wallet connector that bridges NEAR dApps to [near-cli-rs](h
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/near/near-cli-connect/main/assets/demo.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/eee0b63f-d041-425c-9ded-b6950539bdad
 
 ## How it works
 
