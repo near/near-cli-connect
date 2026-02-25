@@ -45,7 +45,7 @@ async function removeStoredFunctionCallKey(network: string): Promise<void> {
 
 function getRpcUrl(network: string): string {
     const providers = window.selector?.providers?.[network as "mainnet" | "testnet"];
-    const fallback = network === "mainnet" ? "https://rpc.mainnet.fastnear.com" : "https://rpc.testnet.fastnear.com";
+    const fallback = network === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.near.org";
     return providers && providers.length > 0 ? providers[0] : fallback;
 }
 
