@@ -10,6 +10,37 @@ import {
     signMessageCommandHtml,
 } from "./view";
 
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+function base58ToBase64(input: string): string {
+    // Count leading '1's (base58 zero bytes)
+    let zeros = 0;
+    while (zeros < input.length && input[zeros] === "1") zeros++;
+
+    // Decode base58 to big-endian byte array
+    const bytes = new Uint8Array(input.length);
+    let length = 0;
+    for (let i = zeros; i < input.length; i++) {
+        let carry = BASE58_ALPHABET.indexOf(input[i]);
+        if (carry < 0) throw new Error(`Invalid base58 character: ${input[i]}`);
+        for (let j = 0; j < length; j++) {
+            carry += bytes[j] * 58;
+            bytes[j] = carry & 0xff;
+            carry >>= 8;
+        }
+        while (carry > 0) {
+            bytes[length++] = carry & 0xff;
+            carry >>= 8;
+        }
+    }
+
+    // Build result: leading zero bytes + decoded bytes in big-endian order
+    const result = new Uint8Array(zeros + length);
+    for (let i = 0; i < length; i++) result[zeros + i] = bytes[length - 1 - i];
+
+    return Buffer.from(result).toString("base64");
+}
+
 interface FunctionCallKey {
     privateKey: string;
     contractId: string;
@@ -225,10 +256,11 @@ function promptSignMessageOutput(command: string, step?: string): Promise<SignMe
                     throw new Error("Missing signature or publicKey in output");
                 }
 
+                const sigData = parsed.signature.replace(/^ed25519:/, "");
                 resolve({
                     accountId: parsed.accountId || "",
                     publicKey: parsed.publicKey,
-                    signature: parsed.signature,
+                    signature: base58ToBase64(sigData),
                 });
             } catch (err: any) {
                 showError(root, `Could not parse output: ${err.message}`);
