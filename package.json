@@ -1,14 +1,22 @@
 {
-  "name": "near-cli-connect",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "vite build"
-  },
-  "devDependencies": {
-    "@near-js/crypto": "^2.5.1",
-    "typescript": "^5.2.2",
-    "vite": "^5.3.4",
-    "vite-plugin-node-polyfills": "^0.24.0"
-  }
+    "name": "near-cli-connect",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "build": "vite build",
+        "lint": "eslint 'src/**/*.ts'",
+        "fmt": "prettier --write 'src/**/*.ts' '*.config.*' '*.json'",
+        "fmt:check": "prettier --check 'src/**/*.ts' '*.config.*' '*.json'"
+    },
+    "devDependencies": {
+        "@near-js/crypto": "^2.5.1",
+        "@typescript-eslint/eslint-plugin": "^8.56.1",
+        "@typescript-eslint/parser": "^8.56.1",
+        "eslint": "^10.0.2",
+        "eslint-config-prettier": "^10.1.8",
+        "prettier": "^3.8.1",
+        "typescript": "^5.2.2",
+        "vite": "^5.3.4",
+        "vite-plugin-node-polyfills": "^0.24.0"
+    }
 }

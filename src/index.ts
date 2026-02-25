@@ -3,458 +3,478 @@ import { KeyPair } from "@near-js/crypto";
 import { ConnectorAction } from "./action";
 import { buildAddKeyCommand, buildTransactionCommand, buildSignMessageCommand, Network } from "./commands";
 import {
-  headHtml,
-  accountIdInputHtml,
-  addKeyCommandHtml,
-  transactionCommandHtml,
-  signMessageCommandHtml,
+    headHtml,
+    accountIdInputHtml,
+    addKeyCommandHtml,
+    transactionCommandHtml,
+    signMessageCommandHtml,
 } from "./view";
 
 interface FunctionCallKey {
-  privateKey: string;
-  contractId: string;
-  methods: string[];
+    privateKey: string;
+    contractId: string;
+    methods: string[];
 }
 
 const storage = () => window.selector.storage;
 
 async function getStoredAccountId(network: string): Promise<string> {
-  return (await storage().get(`cli:${network}:accountId`)) || "";
+    return (await storage().get(`cli:${network}:accountId`)) || "";
 }
 
 async function setStoredAccountId(network: string, accountId: string): Promise<void> {
-  await storage().set(`cli:${network}:accountId`, accountId);
+    await storage().set(`cli:${network}:accountId`, accountId);
 }
 
 async function removeStoredAccountId(network: string): Promise<void> {
-  await storage().remove(`cli:${network}:accountId`);
+    await storage().remove(`cli:${network}:accountId`);
 }
 
 async function getStoredFunctionCallKey(network: string): Promise<FunctionCallKey | null> {
-  const raw = await storage().get(`cli:${network}:functionCallKey`);
-  return raw ? JSON.parse(raw) : null;
+    const raw = await storage().get(`cli:${network}:functionCallKey`);
+    return raw ? JSON.parse(raw) : null;
 }
 
 async function setStoredFunctionCallKey(network: string, key: FunctionCallKey): Promise<void> {
-  await storage().set(`cli:${network}:functionCallKey`, JSON.stringify(key));
+    await storage().set(`cli:${network}:functionCallKey`, JSON.stringify(key));
 }
 
 async function removeStoredFunctionCallKey(network: string): Promise<void> {
-  await storage().remove(`cli:${network}:functionCallKey`);
+    await storage().remove(`cli:${network}:functionCallKey`);
 }
 
 function getRpcUrl(network: string): string {
-  const providers = window.selector?.providers?.[network as "mainnet" | "testnet"];
-  const fallback = network === "mainnet" ? "https://rpc.mainnet.fastnear.com" : "https://rpc.testnet.fastnear.com";
-  return providers && providers.length > 0 ? providers[0] : fallback;
+    const providers = window.selector?.providers?.[network as "mainnet" | "testnet"];
+    const fallback = network === "mainnet" ? "https://rpc.mainnet.fastnear.com" : "https://rpc.testnet.fastnear.com";
+    return providers && providers.length > 0 ? providers[0] : fallback;
 }
 
 async function txStatus(rpcUrl: string, txHash: string, signerId: string): Promise<any> {
-  const res = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tx",
-      params: { tx_hash: txHash, sender_account_id: signerId, wait_until: "NONE" },
-    }),
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
-  return json.result;
+    const res = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tx",
+            params: { tx_hash: txHash, sender_account_id: signerId, wait_until: "NONE" },
+        }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+    return json.result;
 }
 
 function renderPage(html: string): HTMLElement {
-  document.head.innerHTML = headHtml;
-  document.body.innerHTML = "";
-  const root = document.createElement("div");
-  root.style.height = "100%";
-  root.innerHTML = html;
-  document.body.appendChild(root);
-  return root;
+    document.head.innerHTML = headHtml;
+    document.body.innerHTML = "";
+    const root = document.createElement("div");
+    root.style.height = "100%";
+    root.innerHTML = html;
+    document.body.appendChild(root);
+    return root;
 }
 
 function setupCopyButtons(root: HTMLElement): void {
-  root.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const command = btn.getAttribute("data-command") || "";
-      try {
-        await navigator.clipboard.writeText(command);
-        const orig = btn.textContent;
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-          btn.textContent = orig;
-        }, 1500);
-      } catch {
-        const code = btn.parentElement?.querySelector("code");
-        if (code) {
-          const range = document.createRange();
-          range.selectNodeContents(code);
-          const sel = window.getSelection();
-          sel?.removeAllRanges();
-          sel?.addRange(range);
-        }
-      }
+    root.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const command = btn.getAttribute("data-command") || "";
+            try {
+                await navigator.clipboard.writeText(command);
+                const orig = btn.textContent;
+                btn.textContent = "Copied!";
+                setTimeout(() => {
+                    btn.textContent = orig;
+                }, 1500);
+            } catch {
+                const code = btn.parentElement?.querySelector("code");
+                if (code) {
+                    const range = document.createRange();
+                    range.selectNodeContents(code);
+                    const sel = window.getSelection();
+                    sel?.removeAllRanges();
+                    sel?.addRange(range);
+                }
+            }
+        });
     });
-  });
 }
 
 function showError(root: HTMLElement, message: string): void {
-  const el = root.querySelector<HTMLElement>("#error");
-  if (el) {
-    el.textContent = message;
-    el.style.display = "block";
-  }
+    const el = root.querySelector<HTMLElement>("#error");
+    if (el) {
+        el.textContent = message;
+        el.style.display = "block";
+    }
 }
 
 function promptAccountId(opts: {
-  title: string;
-  subtitle?: string;
-  buttonText: string;
-  step?: string;
+    title: string;
+    subtitle?: string;
+    buttonText: string;
+    step?: string;
 }): Promise<string> {
-  return new Promise((resolve) => {
-    const root = renderPage(accountIdInputHtml(opts));
-    window.selector.ui.showIframe();
+    return new Promise((resolve) => {
+        const root = renderPage(accountIdInputHtml(opts));
+        window.selector.ui.showIframe();
 
-    const input = root.querySelector<HTMLInputElement>("#account-id")!;
-    const btn = root.querySelector<HTMLButtonElement>("#submit-btn")!;
+        const input = root.querySelector<HTMLInputElement>("#account-id")!;
+        const btn = root.querySelector<HTMLButtonElement>("#submit-btn")!;
 
-    const submit = () => {
-      const accountId = input.value.trim();
-      if (!accountId) {
-        showError(root, "Please enter an account ID");
-        return;
-      }
-      resolve(accountId);
-    };
+        const submit = () => {
+            const accountId = input.value.trim();
+            if (!accountId) {
+                showError(root, "Please enter an account ID");
+                return;
+            }
+            resolve(accountId);
+        };
 
-    btn.addEventListener("click", submit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit();
+        btn.addEventListener("click", submit);
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") submit();
+        });
     });
-  });
 }
 
 function parseHashInput(raw: string): string {
-  const urlMatch = raw.match(/(?:txns?|transactions)\/([A-Za-z0-9]{43,44})/);
-  if (urlMatch) return urlMatch[1];
-  const match = raw.match(/(?:Transaction ID:\s*)?([A-Za-z0-9]{43,44})/);
-  return match ? match[1] : raw;
+    const urlMatch = raw.match(/(?:txns?|transactions)\/([A-Za-z0-9]{43,44})/);
+    if (urlMatch) return urlMatch[1];
+    const match = raw.match(/(?:Transaction ID:\s*)?([A-Za-z0-9]{43,44})/);
+    return match ? match[1] : raw;
 }
 
 async function verifyTransaction(rpcUrl: string, txHash: string, signerId: string, retries = 5): Promise<any> {
-  let lastError: unknown;
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await txStatus(rpcUrl, txHash, signerId);
-    } catch (err) {
-      lastError = err;
-      if (i < retries - 1) await new Promise((r) => setTimeout(r, 2000));
+    let lastError: unknown;
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await txStatus(rpcUrl, txHash, signerId);
+        } catch (err) {
+            lastError = err;
+            if (i < retries - 1) await new Promise((r) => setTimeout(r, 2000));
+        }
     }
-  }
-  throw lastError ?? new Error(`Transaction ${txHash} not found after ${retries} attempts`);
+    throw lastError ?? new Error(`Transaction ${txHash} not found after ${retries} attempts`);
 }
 
 function promptHashAndVerify(renderHtml: string, rpcUrl: string, signerId: string): Promise<any> {
-  return new Promise((resolve) => {
-    const root = renderPage(renderHtml);
-    setupCopyButtons(root);
-    window.selector.ui.showIframe();
+    return new Promise((resolve) => {
+        const root = renderPage(renderHtml);
+        setupCopyButtons(root);
+        window.selector.ui.showIframe();
 
-    const input = root.querySelector<HTMLInputElement>("#tx-hash")!;
-    const btn = root.querySelector<HTMLButtonElement>("#verify-btn")!;
+        const input = root.querySelector<HTMLInputElement>("#tx-hash")!;
+        const btn = root.querySelector<HTMLButtonElement>("#verify-btn")!;
 
-    const submit = async () => {
-      const raw = input.value.trim();
-      if (!raw) {
-        showError(root, "Please paste the transaction hash or explorer URL");
-        return;
-      }
+        const submit = async () => {
+            const raw = input.value.trim();
+            if (!raw) {
+                showError(root, "Please paste the transaction hash or explorer URL");
+                return;
+            }
 
-      const hash = parseHashInput(raw);
-      btn.disabled = true;
-      btn.textContent = "Verifying...";
+            const hash = parseHashInput(raw);
+            btn.disabled = true;
+            btn.textContent = "Verifying...";
 
-      try {
-        const result = await verifyTransaction(rpcUrl, hash, signerId);
-        resolve(result);
-      } catch {
-        showError(root, "Transaction not found. Please check the hash and try again.");
-        btn.disabled = false;
-        btn.textContent = "Verify";
-      }
-    };
+            try {
+                const result = await verifyTransaction(rpcUrl, hash, signerId);
+                resolve(result);
+            } catch {
+                showError(root, "Transaction not found. Please check the hash and try again.");
+                btn.disabled = false;
+                btn.textContent = "Verify";
+            }
+        };
 
-    btn.addEventListener("click", submit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit();
+        btn.addEventListener("click", submit);
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") submit();
+        });
     });
-  });
 }
 
 interface SignMessageOutput {
-  accountId: string;
-  publicKey: string;
-  signature: string;
+    accountId: string;
+    publicKey: string;
+    signature: string;
 }
 
 function promptSignMessageOutput(command: string, step?: string): Promise<SignMessageOutput> {
-  return new Promise((resolve) => {
-    const root = renderPage(signMessageCommandHtml(command, step));
-    setupCopyButtons(root);
-    window.selector.ui.showIframe();
+    return new Promise((resolve) => {
+        const root = renderPage(signMessageCommandHtml(command, step));
+        setupCopyButtons(root);
+        window.selector.ui.showIframe();
 
-    const textarea = root.querySelector<HTMLTextAreaElement>("#sign-output")!;
-    const btn = root.querySelector<HTMLButtonElement>("#submit-sign-btn")!;
+        const textarea = root.querySelector<HTMLTextAreaElement>("#sign-output")!;
+        const btn = root.querySelector<HTMLButtonElement>("#submit-sign-btn")!;
 
-    btn.addEventListener("click", () => {
-      const raw = textarea.value.trim();
-      if (!raw) {
-        showError(root, "Please paste the command output");
-        return;
-      }
+        btn.addEventListener("click", () => {
+            const raw = textarea.value.trim();
+            if (!raw) {
+                showError(root, "Please paste the command output");
+                return;
+            }
 
-      try {
-        const jsonMatch = raw.match(/\{[\s\S]*"signature"[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No valid JSON found");
+            try {
+                const jsonMatch = raw.match(/\{[\s\S]*"signature"[\s\S]*\}/);
+                if (!jsonMatch) throw new Error("No valid JSON found");
 
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (!parsed.signature || !parsed.publicKey) {
-          throw new Error("Missing signature or publicKey in output");
-        }
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (!parsed.signature || !parsed.publicKey) {
+                    throw new Error("Missing signature or publicKey in output");
+                }
 
-        resolve({
-          accountId: parsed.accountId || "",
-          publicKey: parsed.publicKey,
-          signature: parsed.signature,
+                resolve({
+                    accountId: parsed.accountId || "",
+                    publicKey: parsed.publicKey,
+                    signature: parsed.signature,
+                });
+            } catch (err: any) {
+                showError(root, `Could not parse output: ${err.message}`);
+            }
         });
-      } catch (err: any) {
-        showError(root, `Could not parse output: ${err.message}`);
-      }
     });
-  });
 }
 
 class NearCliWallet {
-  signIn = async ({ contractId, methodNames, network }: any) => {
-    const existingAccountId = await getStoredAccountId(network);
-    const existingKey = await getStoredFunctionCallKey(network);
+    signIn = async ({ contractId, methodNames, network }: any) => {
+        const existingAccountId = await getStoredAccountId(network);
+        const existingKey = await getStoredFunctionCallKey(network);
 
-    if (existingAccountId && (!contractId || existingKey?.contractId === contractId)) {
-      const publicKey = existingKey ? KeyPair.fromString(existingKey.privateKey as any).getPublicKey().toString() : "";
-      return [{ accountId: existingAccountId, publicKey }];
-    }
+        if (existingAccountId && (!contractId || existingKey?.contractId === contractId)) {
+            const publicKey = existingKey
+                ? KeyPair.fromString(existingKey.privateKey as any)
+                      .getPublicKey()
+                      .toString()
+                : "";
+            return [{ accountId: existingAccountId, publicKey }];
+        }
 
-    const needsAccountId = !existingAccountId;
-    const accountId = existingAccountId || await promptAccountId({
-      title: "Connect with NEAR CLI",
-      subtitle: "Enter your NEAR account ID",
-      buttonText: contractId ? "Next" : "Connect",
-      step: contractId && needsAccountId ? "Step 1 of 2" : undefined,
-    });
+        const needsAccountId = !existingAccountId;
+        const accountId =
+            existingAccountId ||
+            (await promptAccountId({
+                title: "Connect with NEAR CLI",
+                subtitle: "Enter your NEAR account ID",
+                buttonText: contractId ? "Next" : "Connect",
+                step: contractId && needsAccountId ? "Step 1 of 2" : undefined,
+            }));
 
-    if (contractId) {
-      const keyPair = KeyPair.fromRandom("ed25519");
-      const publicKey = keyPair.getPublicKey().toString();
+        if (contractId) {
+            const keyPair = KeyPair.fromRandom("ed25519");
+            const publicKey = keyPair.getPublicKey().toString();
 
-      const command = buildAddKeyCommand({
-        accountId,
-        publicKey,
-        contractId,
-        methodNames,
-        network,
-      });
+            const command = buildAddKeyCommand({
+                accountId,
+                publicKey,
+                contractId,
+                methodNames,
+                network,
+            });
 
-      const rpcUrl = getRpcUrl(network);
-      await promptHashAndVerify(addKeyCommandHtml(command, needsAccountId ? "Step 2 of 2" : undefined), rpcUrl, accountId);
+            const rpcUrl = getRpcUrl(network);
+            await promptHashAndVerify(
+                addKeyCommandHtml(command, needsAccountId ? "Step 2 of 2" : undefined),
+                rpcUrl,
+                accountId,
+            );
 
-      const fcKey: FunctionCallKey = {
-        privateKey: keyPair.toString(),
-        contractId,
-        methods: methodNames || [],
-      };
-      await setStoredAccountId(network, accountId);
-      await setStoredFunctionCallKey(network, fcKey);
+            const fcKey: FunctionCallKey = {
+                privateKey: keyPair.toString(),
+                contractId,
+                methods: methodNames || [],
+            };
+            await setStoredAccountId(network, accountId);
+            await setStoredFunctionCallKey(network, fcKey);
 
-      return [{ accountId, publicKey }];
-    }
+            return [{ accountId, publicKey }];
+        }
 
-    await setStoredAccountId(network, accountId);
-    return [{ accountId, publicKey: "" }];
-  };
+        await setStoredAccountId(network, accountId);
+        return [{ accountId, publicKey: "" }];
+    };
 
-  signInAndSignMessage = async ({ contractId, methodNames, network, messageParams }: any) => {
-    const { message, recipient, nonce } = messageParams;
-    const existingAccountId = await getStoredAccountId(network);
-    const existingKey = await getStoredFunctionCallKey(network);
+    signInAndSignMessage = async ({ contractId, methodNames, network, messageParams }: any) => {
+        const { message, recipient, nonce } = messageParams;
+        const existingAccountId = await getStoredAccountId(network);
+        const existingKey = await getStoredFunctionCallKey(network);
 
-    const needsAccountId = !existingAccountId;
-    const needsAddKey = contractId && existingKey?.contractId !== contractId;
+        const needsAccountId = !existingAccountId;
+        const needsAddKey = contractId && existingKey?.contractId !== contractId;
 
-    let totalSteps = 1;
-    if (needsAccountId) totalSteps++;
-    if (needsAddKey) totalSteps++;
-    let currentStep = 0;
+        let totalSteps = 1;
+        if (needsAccountId) totalSteps++;
+        if (needsAddKey) totalSteps++;
+        let currentStep = 0;
 
-    const accountId = existingAccountId || await promptAccountId({
-      title: "Connect with NEAR CLI",
-      subtitle: "Enter your NEAR account ID to sign in and sign a message",
-      buttonText: "Next",
-      step: `Step ${++currentStep} of ${totalSteps}`,
-    });
+        const accountId =
+            existingAccountId ||
+            (await promptAccountId({
+                title: "Connect with NEAR CLI",
+                subtitle: "Enter your NEAR account ID to sign in and sign a message",
+                buttonText: "Next",
+                step: `Step ${++currentStep} of ${totalSteps}`,
+            }));
 
-    const nonceBase64 = Buffer.from(nonce).toString("base64");
-    const command = buildSignMessageCommand({
-      message,
-      recipient,
-      nonce: nonceBase64,
-      network,
-      signerId: accountId,
-    });
-
-    const output = await promptSignMessageOutput(command, `Step ${++currentStep} of ${totalSteps}`);
-
-    let publicKey = output.publicKey;
-    if (needsAddKey) {
-      const keyPair = KeyPair.fromRandom("ed25519");
-      publicKey = keyPair.getPublicKey().toString();
-
-      const addKeyCmd = buildAddKeyCommand({
-        accountId,
-        publicKey,
-        contractId,
-        methodNames,
-        network,
-      });
-
-      const rpcUrl = getRpcUrl(network);
-      await promptHashAndVerify(addKeyCommandHtml(addKeyCmd, `Step ${++currentStep} of ${totalSteps}`), rpcUrl, accountId);
-
-      const fcKey: FunctionCallKey = {
-        privateKey: keyPair.toString(),
-        contractId,
-        methods: methodNames || [],
-      };
-      await setStoredFunctionCallKey(network, fcKey);
-    }
-
-    await setStoredAccountId(network, accountId);
-
-    return [
-      {
-        accountId,
-        publicKey,
-        signedMessage: {
-          accountId: output.accountId || accountId,
-          publicKey: output.publicKey,
-          signature: output.signature,
-        },
-      },
-    ];
-  };
-
-  signOut = async ({ network }: { network: string }) => {
-    await removeStoredAccountId(network);
-    await removeStoredFunctionCallKey(network);
-  };
-
-  getAccounts = async ({ network }: { network: string }) => {
-    const accountId = await getStoredAccountId(network);
-    if (!accountId) return [];
-    const fcKey = await getStoredFunctionCallKey(network);
-    const publicKey = fcKey ? KeyPair.fromString(fcKey.privateKey as any).getPublicKey().toString() : "";
-    return [{ accountId, publicKey }];
-  };
-
-  signAndSendTransaction = async ({
-    receiverId,
-    actions,
-    network,
-  }: {
-    receiverId: string;
-    actions: ConnectorAction[];
-    network: string;
-  }): Promise<any> => {
-    const accountId = await getStoredAccountId(network);
-    if (!accountId) throw new Error("Wallet not signed in");
-
-    const command = buildTransactionCommand({
-      signerId: accountId,
-      receiverId,
-      actions,
-      network: network as Network,
-    });
-
-    try {
-      const rpcUrl = getRpcUrl(network);
-      return await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
-    } finally {
-      window.selector.ui.hideIframe();
-    }
-  };
-
-  signAndSendTransactions = async ({
-    transactions,
-    network,
-  }: {
-    transactions: { receiverId: string; actions: ConnectorAction[] }[];
-    network: string;
-  }): Promise<any[]> => {
-    const accountId = await getStoredAccountId(network);
-    if (!accountId) throw new Error("Wallet not signed in");
-
-    const rpcUrl = getRpcUrl(network);
-    const results: any[] = [];
-
-    try {
-      for (const tx of transactions) {
-        const command = buildTransactionCommand({
-          signerId: accountId,
-          receiverId: tx.receiverId,
-          actions: tx.actions,
-          network: network as Network,
+        const nonceBase64 = Buffer.from(nonce).toString("base64");
+        const command = buildSignMessageCommand({
+            message,
+            recipient,
+            nonce: nonceBase64,
+            network,
+            signerId: accountId,
         });
 
-        const result = await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
-        results.push(result);
-      }
+        const output = await promptSignMessageOutput(command, `Step ${++currentStep} of ${totalSteps}`);
 
-      return results;
-    } finally {
-      window.selector.ui.hideIframe();
-    }
-  };
+        let publicKey = output.publicKey;
+        if (needsAddKey) {
+            const keyPair = KeyPair.fromRandom("ed25519");
+            publicKey = keyPair.getPublicKey().toString();
 
-  signMessage = async ({ message, nonce, recipient, network }: any) => {
-    const accountId = await getStoredAccountId(network);
-    if (!accountId) throw new Error("Wallet not signed in");
+            const addKeyCmd = buildAddKeyCommand({
+                accountId,
+                publicKey,
+                contractId,
+                methodNames,
+                network,
+            });
 
-    const nonceBase64 = Buffer.from(nonce).toString("base64");
-    const command = buildSignMessageCommand({
-      message,
-      recipient,
-      nonce: nonceBase64,
-      network,
-      signerId: accountId,
-    });
+            const rpcUrl = getRpcUrl(network);
+            await promptHashAndVerify(
+                addKeyCommandHtml(addKeyCmd, `Step ${++currentStep} of ${totalSteps}`),
+                rpcUrl,
+                accountId,
+            );
 
-    try {
-      const output = await promptSignMessageOutput(command);
-      return {
-        accountId: output.accountId || accountId,
-        publicKey: output.publicKey,
-        signature: output.signature,
-      };
-    } finally {
-      window.selector.ui.hideIframe();
-    }
-  };
+            const fcKey: FunctionCallKey = {
+                privateKey: keyPair.toString(),
+                contractId,
+                methods: methodNames || [],
+            };
+            await setStoredFunctionCallKey(network, fcKey);
+        }
 
-  signDelegateActions = async () => {
-    throw new Error("signDelegateActions is not supported by NEAR CLI wallet");
-  };
+        await setStoredAccountId(network, accountId);
+
+        return [
+            {
+                accountId,
+                publicKey,
+                signedMessage: {
+                    accountId: output.accountId || accountId,
+                    publicKey: output.publicKey,
+                    signature: output.signature,
+                },
+            },
+        ];
+    };
+
+    signOut = async ({ network }: { network: string }) => {
+        await removeStoredAccountId(network);
+        await removeStoredFunctionCallKey(network);
+    };
+
+    getAccounts = async ({ network }: { network: string }) => {
+        const accountId = await getStoredAccountId(network);
+        if (!accountId) return [];
+        const fcKey = await getStoredFunctionCallKey(network);
+        const publicKey = fcKey
+            ? KeyPair.fromString(fcKey.privateKey as any)
+                  .getPublicKey()
+                  .toString()
+            : "";
+        return [{ accountId, publicKey }];
+    };
+
+    signAndSendTransaction = async ({
+        receiverId,
+        actions,
+        network,
+    }: {
+        receiverId: string;
+        actions: ConnectorAction[];
+        network: string;
+    }): Promise<any> => {
+        const accountId = await getStoredAccountId(network);
+        if (!accountId) throw new Error("Wallet not signed in");
+
+        const command = buildTransactionCommand({
+            signerId: accountId,
+            receiverId,
+            actions,
+            network: network as Network,
+        });
+
+        try {
+            const rpcUrl = getRpcUrl(network);
+            return await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
+        } finally {
+            window.selector.ui.hideIframe();
+        }
+    };
+
+    signAndSendTransactions = async ({
+        transactions,
+        network,
+    }: {
+        transactions: { receiverId: string; actions: ConnectorAction[] }[];
+        network: string;
+    }): Promise<any[]> => {
+        const accountId = await getStoredAccountId(network);
+        if (!accountId) throw new Error("Wallet not signed in");
+
+        const rpcUrl = getRpcUrl(network);
+        const results: any[] = [];
+
+        try {
+            for (const tx of transactions) {
+                const command = buildTransactionCommand({
+                    signerId: accountId,
+                    receiverId: tx.receiverId,
+                    actions: tx.actions,
+                    network: network as Network,
+                });
+
+                const result = await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
+                results.push(result);
+            }
+
+            return results;
+        } finally {
+            window.selector.ui.hideIframe();
+        }
+    };
+
+    signMessage = async ({ message, nonce, recipient, network }: any) => {
+        const accountId = await getStoredAccountId(network);
+        if (!accountId) throw new Error("Wallet not signed in");
+
+        const nonceBase64 = Buffer.from(nonce).toString("base64");
+        const command = buildSignMessageCommand({
+            message,
+            recipient,
+            nonce: nonceBase64,
+            network,
+            signerId: accountId,
+        });
+
+        try {
+            const output = await promptSignMessageOutput(command);
+            return {
+                accountId: output.accountId || accountId,
+                publicKey: output.publicKey,
+                signature: output.signature,
+            };
+        } finally {
+            window.selector.ui.hideIframe();
+        }
+    };
+
+    signDelegateActions = async () => {
+        throw new Error("signDelegateActions is not supported by NEAR CLI wallet");
+    };
 }
 
 window.selector.ready(new NearCliWallet());

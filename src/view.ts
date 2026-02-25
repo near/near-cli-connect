@@ -194,11 +194,11 @@ export const headHtml = /* html */ `
 `;
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function commandBlockHtml(command: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="command-block">
       <pre><code>${escapeHtml(command)}</code></pre>
       <button class="copy-btn" data-command="${escapeHtml(command)}">Copy</button>
@@ -206,8 +206,13 @@ function commandBlockHtml(command: string): string {
   `;
 }
 
-export function accountIdInputHtml(opts: { title: string; subtitle?: string; buttonText: string; step?: string }): string {
-  return /* html */ `
+export function accountIdInputHtml(opts: {
+    title: string;
+    subtitle?: string;
+    buttonText: string;
+    step?: string;
+}): string {
+    return /* html */ `
     <div class="container">
       ${opts.step ? `<div class="step-indicator">${escapeHtml(opts.step)}</div>` : ""}
       <h2>${escapeHtml(opts.title)}</h2>
@@ -222,7 +227,7 @@ export function accountIdInputHtml(opts: { title: string; subtitle?: string; but
 }
 
 export function addKeyCommandHtml(command: string, step?: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="container">
       ${step ? `<div class="step-indicator">${escapeHtml(step)}</div>` : ""}
       <h2>Add access key</h2>
@@ -239,7 +244,7 @@ export function addKeyCommandHtml(command: string, step?: string): string {
 }
 
 export function transactionCommandHtml(command: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="container">
       <h2>Sign transaction</h2>
       <p class="subtitle">Run this command in your terminal, then paste the transaction hash or explorer URL below</p>
@@ -255,7 +260,7 @@ export function transactionCommandHtml(command: string): string {
 }
 
 export function signMessageCommandHtml(command: string, step?: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="container">
       ${step ? `<div class="step-indicator">${escapeHtml(step)}</div>` : ""}
       <h2>Sign message</h2>
@@ -272,7 +277,7 @@ export function signMessageCommandHtml(command: string, step?: string): string {
 }
 
 export function loadingHtml(message: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="container">
       <div class="spinner"></div>
       <p class="subtitle">${escapeHtml(message)}</p>
@@ -281,7 +286,7 @@ export function loadingHtml(message: string): string {
 }
 
 export function errorHtml(message: string): string {
-  return /* html */ `
+    return /* html */ `
     <div class="container">
       <h2>Error</h2>
       <p class="subtitle" style="color: #ff6b6b">${escapeHtml(message)}</p>
