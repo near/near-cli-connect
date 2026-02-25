@@ -7,9 +7,6 @@
   },
   "devDependencies": {
     "@near-js/crypto": "^2.5.1",
-    "@near-js/providers": "^2.5.1",
-    "@near-js/types": "^2.5.1",
-    "@near-js/utils": "^2.5.1",
     "typescript": "^5.2.2",
     "vite": "^5.3.4",
     "vite-plugin-node-polyfills": "^0.24.0"

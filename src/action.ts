@@ -1,12 +1,3 @@
-import { PublicKey } from "@near-js/crypto";
-import { baseDecode } from "@near-js/utils";
-import {
-  Action,
-  actionCreators,
-  GlobalContractDeployMode,
-  GlobalContractIdentifier,
-} from "@near-js/transactions";
-
 export interface CreateAccountAction {
   type: "CreateAccount";
 }
@@ -91,66 +82,3 @@ export type ConnectorAction =
   | DeleteAccountAction
   | UseGlobalContractAction
   | DeployGlobalContractAction;
-
-export const connectorActionsToNearActions = (actions: ConnectorAction[]): Action[] => {
-  return actions.map((action) => {
-    if (!("type" in action)) return action as Action;
-
-    if (action.type === "FunctionCall") {
-      return actionCreators.functionCall(action.params.methodName, action.params.args as any, BigInt(action.params.gas), BigInt(action.params.deposit));
-    }
-
-    if (action.type === "DeployGlobalContract") {
-      const deployMode =
-        action.params.deployMode === "AccountId" ? new GlobalContractDeployMode({ AccountId: null }) : new GlobalContractDeployMode({ CodeHash: null });
-      return actionCreators.deployGlobalContract(action.params.code, deployMode);
-    }
-
-    if (action.type === "CreateAccount") {
-      return actionCreators.createAccount();
-    }
-
-    if (action.type === "UseGlobalContract") {
-      const contractIdentifier =
-        "accountId" in action.params.contractIdentifier
-          ? new GlobalContractIdentifier({ AccountId: action.params.contractIdentifier.accountId })
-          : new GlobalContractIdentifier({ CodeHash: baseDecode(action.params.contractIdentifier.codeHash) });
-      return actionCreators.useGlobalContract(contractIdentifier);
-    }
-
-    if (action.type === "DeployContract") {
-      return actionCreators.deployContract(action.params.code);
-    }
-
-    if (action.type === "DeleteAccount") {
-      return actionCreators.deleteAccount(action.params.beneficiaryId);
-    }
-
-    if (action.type === "DeleteKey") {
-      return actionCreators.deleteKey(PublicKey.from(action.params.publicKey));
-    }
-
-    if (action.type === "Transfer") {
-      return actionCreators.transfer(BigInt(action.params.deposit));
-    }
-
-    if (action.type === "Stake") {
-      return actionCreators.stake(BigInt(action.params.stake), PublicKey.from(action.params.publicKey));
-    }
-
-    if (action.type === "AddKey") {
-      return actionCreators.addKey(
-        PublicKey.from(action.params.publicKey),
-        action.params.accessKey.permission === "FullAccess"
-          ? actionCreators.fullAccessKey()
-          : actionCreators.functionCallAccessKey(
-            action.params.accessKey.permission.receiverId,
-            action.params.accessKey.permission.methodNames ?? [],
-            BigInt(action.params.accessKey.permission.allowance ?? 0),
-          )
-      );
-    }
-
-    throw new Error("Invalid action");
-  });
-};
