@@ -200,6 +200,28 @@ export function buildTransactionCommand({
     ].join(" \\\n    ");
 }
 
+export function buildMetaTransactionCommand({
+    signerId,
+    receiverId,
+    actions,
+    network,
+}: {
+    signerId: string;
+    receiverId: string;
+    actions: ConnectorAction[];
+    network: Network;
+}): string {
+    const actionParts = actions.map(buildActionPart);
+    return [
+        "near transaction",
+        `construct-meta-transaction '${shellEscape(signerId)}' '${shellEscape(receiverId)}'`,
+        ...actionParts,
+        "skip",
+        `network-config ${network}`,
+        "sign-with-keychain display",
+    ].join(" \\\n    ");
+}
+
 export function buildSignMessageCommand({
     message,
     recipient,

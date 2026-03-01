@@ -276,6 +276,23 @@ export function signMessageCommandHtml(command: string, step?: string): string {
   `;
 }
 
+export function delegateActionCommandHtml(command: string, step?: string): string {
+    return /* html */ `
+    <div class="container">
+      ${step ? `<div class="step-indicator">${escapeHtml(step)}</div>` : ""}
+      <h2>Sign delegate action</h2>
+      <p class="subtitle">Run this command in your terminal (requires near-cli-rs &ge; 0.24.0), then paste the base64 output below</p>
+      ${commandBlockHtml(command)}
+      <div class="field-group">
+        <label class="field-label">Signed delegate action (base64)</label>
+        <textarea id="delegate-output" placeholder="Paste the base64 output here"></textarea>
+      </div>
+      <div id="error" class="error-text" style="display:none"></div>
+      <button class="btn" id="submit-delegate-btn">Submit</button>
+    </div>
+  `;
+}
+
 export function loadingHtml(message: string): string {
     return /* html */ `
     <div class="container">
