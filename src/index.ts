@@ -2,13 +2,20 @@ import { KeyPair } from "@near-js/crypto";
 import { baseDecode } from "@near-js/utils";
 
 import { ConnectorAction } from "./action";
-import { buildAddKeyCommand, buildTransactionCommand, buildSignMessageCommand, Network } from "./commands";
+import {
+    buildAddKeyCommand,
+    buildTransactionCommand,
+    buildMetaTransactionCommand,
+    buildSignMessageCommand,
+    Network,
+} from "./commands";
 import {
     headHtml,
     accountIdInputHtml,
     addKeyCommandHtml,
     transactionCommandHtml,
     signMessageCommandHtml,
+    delegateActionCommandHtml,
 } from "./view";
 
 interface FunctionCallKey {
@@ -235,6 +242,42 @@ function promptSignMessageOutput(command: string, step?: string): Promise<SignMe
             } catch (err: any) {
                 showError(root, `Could not parse output: ${err.message}`);
             }
+        });
+    });
+}
+
+function extractBase64(raw: string): string | null {
+    const trimmed = raw.trim();
+    // Try to find the longest base64-looking substring (at least 20 chars)
+    const matches = trimmed.match(/[A-Za-z0-9+/=]{20,}/g);
+    if (!matches) return null;
+    // Return the longest match (the blob itself, not short fragments)
+    return matches.reduce((a, b) => (a.length >= b.length ? a : b));
+}
+
+function promptDelegateActionOutput(command: string, step?: string): Promise<string> {
+    return new Promise((resolve) => {
+        const root = renderPage(delegateActionCommandHtml(command, step));
+        setupCopyButtons(root);
+        window.selector.ui.showIframe();
+
+        const textarea = root.querySelector<HTMLTextAreaElement>("#delegate-output")!;
+        const btn = root.querySelector<HTMLButtonElement>("#submit-delegate-btn")!;
+
+        btn.addEventListener("click", () => {
+            const raw = textarea.value.trim();
+            if (!raw) {
+                showError(root, "Please paste the base64 output from the command");
+                return;
+            }
+
+            const base64 = extractBase64(raw);
+            if (!base64) {
+                showError(root, "Could not find valid base64 data in the pasted output");
+                return;
+            }
+
+            resolve(base64);
         });
     });
 }
@@ -474,8 +517,38 @@ class NearCliWallet {
         }
     };
 
-    signDelegateActions = async () => {
-        throw new Error("signDelegateActions is not supported by NEAR CLI wallet");
+    signDelegateActions = async ({
+        delegateActions,
+        network,
+    }: {
+        delegateActions: Array<{ actions: ConnectorAction[]; receiverId: string }>;
+        network: string;
+    }): Promise<{ signedDelegateActions: string[] }> => {
+        const accountId = await getStoredAccountId(network);
+        if (!accountId) throw new Error("Wallet not signed in");
+
+        const signedDelegateActions: string[] = [];
+
+        try {
+            const total = delegateActions.length;
+            for (let i = 0; i < delegateActions.length; i++) {
+                const da = delegateActions[i];
+                const command = buildMetaTransactionCommand({
+                    signerId: accountId,
+                    receiverId: da.receiverId,
+                    actions: da.actions,
+                    network: network as Network,
+                });
+
+                const step = total > 1 ? `Step ${i + 1} of ${total}` : undefined;
+                const base64Blob = await promptDelegateActionOutput(command, step);
+                signedDelegateActions.push(base64Blob);
+            }
+
+            return { signedDelegateActions };
+        } finally {
+            window.selector.ui.hideIframe();
+        }
     };
 }
 
