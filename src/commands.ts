@@ -36,37 +36,52 @@ function shellEscape(s: string): string {
     return s.replace(/'/g, "'\\''");
 }
 
+export interface AddFunctionCallKeyParams {
+    contractId: string;
+    publicKey: string;
+    allowMethods: AddFunctionCallKey_AllowMethods;
+    gasAllowance?: AddFunctionCallKey_GasAllowance;
+}
+
+export type AddFunctionCallKey_AllowMethods = { anyMethod: true } | { anyMethod: false; methodNames: string[] };
+
+export type AddFunctionCallKey_GasAllowance = { kind: "unlimited" } | { kind: "limited"; amount: string };
+
 export function buildAddKeyCommand({
     accountId,
-    publicKey,
-    contractId,
-    methodNames,
-    allowance = "0.25",
+    addFunctionCallKey,
     network,
     signingMethod = "sign-with-keychain",
     ledgerHdPath,
 }: {
     accountId: string;
-    publicKey: string;
-    contractId?: string;
-    methodNames?: string[];
-    allowance?: string;
+    addFunctionCallKey: AddFunctionCallKeyParams;
     network: Network;
     signingMethod?: SigningMethod;
     ledgerHdPath?: string;
 }): string {
+    const { contractId, publicKey, allowMethods, gasAllowance } = addFunctionCallKey;
+
+    // Determine the allowance string (default: 0.25 NEAR)
+    let allowanceArg = "'0.25 NEAR'";
+    if (gasAllowance) {
+        if (gasAllowance.kind === "unlimited") {
+            allowanceArg = "'unlimited'";
+        } else {
+            allowanceArg = `'${yoctoToNear(gasAllowance.amount)} NEAR'`;
+        }
+    }
+
     const parts: string[] = ["near account"];
     parts.push(`add-key '${shellEscape(accountId)}'`);
+    parts.push("grant-function-call-access");
+    parts.push(`--allowance ${allowanceArg}`);
+    parts.push(`--contract-account-id '${shellEscape(contractId)}'`);
 
-    if (contractId) {
-        parts.push("grant-function-call-access");
-        parts.push(`--allowance '${allowance} NEAR'`);
-        parts.push(`--contract-account-id '${shellEscape(contractId)}'`);
-        if (methodNames && methodNames.length > 0) {
-            parts.push(`--function-names '${shellEscape(methodNames.join(", "))}'`);
-        }
+    if (allowMethods.anyMethod || allowMethods.methodNames.length === 0) {
+        parts.push(`--function-names ''`);
     } else {
-        parts.push("grant-full-access");
+        parts.push(`--function-names '${shellEscape(allowMethods.methodNames.join(", "))}'`);
     }
 
     parts.push(`use-manually-provided-public-key ${publicKey}`);
