@@ -197,8 +197,12 @@ function promptSigningMethod(opts: { step?: string }): Promise<SigningPreference
 
         cards.forEach((card) => {
             card.addEventListener("click", () => {
-                cards.forEach((c) => c.classList.remove("selected"));
+                cards.forEach((c) => {
+                    c.classList.remove("selected");
+                    c.setAttribute("aria-pressed", "false");
+                });
                 card.classList.add("selected");
+                card.setAttribute("aria-pressed", "true");
                 selected = card.getAttribute("data-method") as SigningMethod;
                 hdPathGroup.style.display = selected === "sign-with-ledger" ? "block" : "none";
             });
@@ -371,8 +375,9 @@ class NearCliWallet {
         }
 
         const needsAccountId = !existingAccountId;
-        let totalSteps = 2; // account ID + signing method
-        if (contractId) totalSteps++; // add-key step
+        let totalSteps = 1; // signing method
+        if (needsAccountId) totalSteps++;
+        if (contractId) totalSteps++;
         let currentStep = 0;
 
         const accountId =
@@ -381,9 +386,8 @@ class NearCliWallet {
                 title: "Connect with NEAR CLI",
                 subtitle: "Enter your NEAR account ID",
                 buttonText: "Next",
-                step: needsAccountId ? `Step ${++currentStep} of ${totalSteps}` : undefined,
+                step: `Step ${++currentStep} of ${totalSteps}`,
             }));
-        if (!needsAccountId) currentStep++;
 
         const { signingMethod, ledgerHdPath } = await promptSigningMethod({
             step: `Step ${++currentStep} of ${totalSteps}`,
@@ -448,7 +452,6 @@ class NearCliWallet {
                 buttonText: "Next",
                 step: `Step ${++currentStep} of ${totalSteps}`,
             }));
-        if (!needsAccountId) currentStep++;
 
         const { signingMethod, ledgerHdPath } = await promptSigningMethod({
             step: `Step ${++currentStep} of ${totalSteps}`,
