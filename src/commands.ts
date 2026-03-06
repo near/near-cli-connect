@@ -2,6 +2,18 @@ import { ConnectorAction } from "./action";
 
 export type Network = "mainnet" | "testnet";
 
+export type SigningMethod = "sign-with-keychain" | "sign-with-ledger";
+
+export const DEFAULT_LEDGER_HD_PATH = "m/44'/397'/0'/0'/1'";
+
+function signingPart(signingMethod: SigningMethod, ledgerHdPath?: string): string {
+    if (signingMethod === "sign-with-ledger") {
+        const hdPath = ledgerHdPath || DEFAULT_LEDGER_HD_PATH;
+        return `sign-with-ledger --seed-phrase-hd-path '${shellEscape(hdPath)}'`;
+    }
+    return "sign-with-keychain";
+}
+
 export function yoctoToNear(yoctoAmount: string): string {
     if (yoctoAmount === "0") return "0";
     const YOCTO_DECIMALS = 24;
@@ -31,6 +43,8 @@ export function buildAddKeyCommand({
     methodNames,
     allowance = "0.25",
     network,
+    signingMethod = "sign-with-keychain",
+    ledgerHdPath,
 }: {
     accountId: string;
     publicKey: string;
@@ -38,6 +52,8 @@ export function buildAddKeyCommand({
     methodNames?: string[];
     allowance?: string;
     network: Network;
+    signingMethod?: SigningMethod;
+    ledgerHdPath?: string;
 }): string {
     const parts: string[] = ["near account"];
     parts.push(`add-key '${shellEscape(accountId)}'`);
@@ -55,7 +71,7 @@ export function buildAddKeyCommand({
 
     parts.push(`use-manually-provided-public-key ${publicKey}`);
     parts.push(`network-config ${network}`);
-    parts.push("sign-with-keychain");
+    parts.push(signingPart(signingMethod, ledgerHdPath));
 
     return parts.join(" \\\n    ");
 }
@@ -126,12 +142,18 @@ export function buildTransactionCommand({
     receiverId,
     actions,
     network,
+    signingMethod = "sign-with-keychain",
+    ledgerHdPath,
 }: {
     signerId: string;
     receiverId: string;
     actions: ConnectorAction[];
     network: Network;
+    signingMethod?: SigningMethod;
+    ledgerHdPath?: string;
 }): string {
+    const sign = signingPart(signingMethod, ledgerHdPath);
+
     if (actions.length === 1 && actions[0].type === "FunctionCall") {
         const fc = actions[0].params;
         const args = JSON.stringify(fc.args);
@@ -144,7 +166,7 @@ export function buildTransactionCommand({
             `attached-deposit '${yoctoToNear(fc.deposit)} NEAR'`,
             `sign-as '${shellEscape(signerId)}'`,
             `network-config ${network}`,
-            "sign-with-keychain",
+            sign,
         ].join(" \\\n    ");
     }
 
@@ -154,7 +176,7 @@ export function buildTransactionCommand({
             `'${shellEscape(signerId)}'`,
             `send-near '${shellEscape(receiverId)}' '${yoctoToNear(actions[0].params.deposit)} NEAR'`,
             `network-config ${network}`,
-            "sign-with-keychain",
+            sign,
         ].join(" \\\n    ");
     }
 
@@ -175,7 +197,7 @@ export function buildTransactionCommand({
         }
         parts.push(`use-manually-provided-public-key ${action.params.publicKey}`);
         parts.push(`network-config ${network}`);
-        parts.push("sign-with-keychain");
+        parts.push(sign);
         return parts.join(" \\\n    ");
     }
 
@@ -185,7 +207,7 @@ export function buildTransactionCommand({
             "near account",
             `delete-keys '${shellEscape(signerId)}' public-keys ${keys}`,
             `network-config ${network}`,
-            "sign-with-keychain",
+            sign,
         ].join(" \\\n    ");
     }
 
@@ -196,7 +218,7 @@ export function buildTransactionCommand({
         ...actionParts,
         "skip",
         `network-config ${network}`,
-        "sign-with-keychain",
+        sign,
     ].join(" \\\n    ");
 }
 
@@ -205,11 +227,15 @@ export function buildMetaTransactionCommand({
     receiverId,
     actions,
     network,
+    signingMethod = "sign-with-keychain",
+    ledgerHdPath,
 }: {
     signerId: string;
     receiverId: string;
     actions: ConnectorAction[];
     network: Network;
+    signingMethod?: SigningMethod;
+    ledgerHdPath?: string;
 }): string {
     const actionParts = actions.map(buildActionPart);
     return [
@@ -218,7 +244,7 @@ export function buildMetaTransactionCommand({
         ...actionParts,
         "skip",
         `network-config ${network}`,
-        "sign-with-keychain display",
+        `${signingPart(signingMethod, ledgerHdPath)} display`,
     ].join(" \\\n    ");
 }
 
@@ -228,20 +254,32 @@ export function buildSignMessageCommand({
     nonce,
     network,
     signerId,
+    signingMethod = "sign-with-keychain",
+    ledgerHdPath,
 }: {
     message: string;
     recipient: string;
     nonce: string;
     network: Network;
     signerId: string;
+    signingMethod?: SigningMethod;
+    ledgerHdPath?: string;
 }): string {
-    return [
+    const parts = [
         "near message sign-nep413",
         `utf8 '${shellEscape(message)}'`,
         `nonce '${shellEscape(nonce)}'`,
         `recipient '${shellEscape(recipient)}'`,
         `sign-as '${shellEscape(signerId)}'`,
-        "sign-with-keychain",
-        `network-config ${network}`,
-    ].join(" \\\n    ");
+    ];
+
+    if (signingMethod === "sign-with-ledger") {
+        // sign-with-ledger under sign-nep413 does not accept network-config
+        parts.push(signingPart(signingMethod, ledgerHdPath));
+    } else {
+        parts.push(signingPart(signingMethod, ledgerHdPath));
+        parts.push(`network-config ${network}`);
+    }
+
+    return parts.join(" \\\n    ");
 }

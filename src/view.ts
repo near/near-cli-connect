@@ -182,6 +182,65 @@ textarea {
   margin-bottom: 6px;
   display: block;
 }
+
+.signing-method-options {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.signing-method-card {
+  flex: 1;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+
+.signing-method-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.signing-method-card.selected {
+  border-color: #00d4aa;
+  background: rgba(0, 212, 170, 0.1);
+}
+
+.signing-method-card-icon {
+  margin-bottom: 10px;
+}
+
+.signing-method-card-icon svg {
+  width: 32px;
+  height: 32px;
+  transition: stroke 0.15s;
+}
+
+.signing-method-card.selected .signing-method-card-icon svg {
+  stroke: #00d4aa;
+}
+
+.signing-method-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.signing-method-card-desc {
+  font-size: 12px;
+  color: #ada5a4;
+  line-height: 1.4;
+}
+
+.hd-path-group {
+  width: 100%;
+  margin-top: 12px;
+}
 `;
 
 export const headHtml = /* html */ `
@@ -289,6 +348,34 @@ export function delegateActionCommandHtml(command: string, step?: string): strin
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="submit-delegate-btn">Submit</button>
+    </div>
+  `;
+}
+
+export function signingMethodSelectorHtml(opts: { step?: string; defaultHdPath: string }): string {
+    return /* html */ `
+    <div class="container">
+      ${opts.step ? `<div class="step-indicator">${escapeHtml(opts.step)}</div>` : ""}
+      <h2>Signing method</h2>
+      <p class="subtitle">Choose how to sign transactions</p>
+      <div class="signing-method-options">
+        <div class="signing-method-card selected" data-method="sign-with-keychain">
+          <div class="signing-method-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#ada5a4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+          <div class="signing-method-card-title">Keychain</div>
+          <div class="signing-method-card-desc">Sign using your OS keychain managed by near-cli</div>
+        </div>
+        <div class="signing-method-card" data-method="sign-with-ledger">
+          <div class="signing-method-card-icon"><svg viewBox="0 0 34 24" fill="none" stroke="#ada5a4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="26" height="14" rx="3"/><rect x="4" y="8" width="10" height="8" rx="1.5"/><path d="M27 9h4a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4"/></svg></div>
+          <div class="signing-method-card-title">Ledger</div>
+          <div class="signing-method-card-desc">Sign using a Ledger hardware wallet</div>
+        </div>
+      </div>
+      <div class="hd-path-group" id="hd-path-group" style="display:none">
+        <label class="field-label">HD derivation path</label>
+        <input type="text" id="hd-path" value="${escapeHtml(opts.defaultHdPath)}" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="error" class="error-text" style="display:none"></div>
+      <button class="btn" id="submit-signing-method-btn">Continue</button>
     </div>
   `;
 }

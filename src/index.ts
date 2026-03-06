@@ -8,6 +8,8 @@ import {
     buildMetaTransactionCommand,
     buildSignMessageCommand,
     Network,
+    SigningMethod,
+    DEFAULT_LEDGER_HD_PATH,
 } from "./commands";
 import {
     headHtml,
@@ -16,6 +18,7 @@ import {
     transactionCommandHtml,
     signMessageCommandHtml,
     delegateActionCommandHtml,
+    signingMethodSelectorHtml,
 } from "./view";
 
 interface FunctionCallKey {
@@ -49,6 +52,31 @@ async function setStoredFunctionCallKey(network: string, key: FunctionCallKey): 
 
 async function removeStoredFunctionCallKey(network: string): Promise<void> {
     await storage().remove(`cli:${network}:functionCallKey`);
+}
+
+async function getStoredSigningMethod(network: string): Promise<SigningMethod> {
+    const raw = await storage().get(`cli:${network}:signingMethod`);
+    return raw === "sign-with-ledger" ? "sign-with-ledger" : "sign-with-keychain";
+}
+
+async function setStoredSigningMethod(network: string, method: SigningMethod): Promise<void> {
+    await storage().set(`cli:${network}:signingMethod`, method);
+}
+
+async function removeStoredSigningMethod(network: string): Promise<void> {
+    await storage().remove(`cli:${network}:signingMethod`);
+}
+
+async function getStoredLedgerHdPath(network: string): Promise<string> {
+    return (await storage().get(`cli:${network}:ledgerHdPath`)) || DEFAULT_LEDGER_HD_PATH;
+}
+
+async function setStoredLedgerHdPath(network: string, hdPath: string): Promise<void> {
+    await storage().set(`cli:${network}:ledgerHdPath`, hdPath);
+}
+
+async function removeStoredLedgerHdPath(network: string): Promise<void> {
+    await storage().remove(`cli:${network}:ledgerHdPath`);
 }
 
 function getRpcUrl(network: string): string {
@@ -141,6 +169,52 @@ function promptAccountId(opts: {
         btn.addEventListener("click", submit);
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") submit();
+        });
+    });
+}
+
+interface SigningPreference {
+    signingMethod: SigningMethod;
+    ledgerHdPath?: string;
+}
+
+function promptSigningMethod(opts: { step?: string }): Promise<SigningPreference> {
+    return new Promise((resolve) => {
+        const root = renderPage(
+            signingMethodSelectorHtml({
+                step: opts.step,
+                defaultHdPath: DEFAULT_LEDGER_HD_PATH,
+            }),
+        );
+        window.selector.ui.showIframe();
+
+        let selected: SigningMethod = "sign-with-keychain";
+
+        const cards = root.querySelectorAll<HTMLElement>(".signing-method-card");
+        const hdPathGroup = root.querySelector<HTMLElement>("#hd-path-group")!;
+        const hdPathInput = root.querySelector<HTMLInputElement>("#hd-path")!;
+        const btn = root.querySelector<HTMLButtonElement>("#submit-signing-method-btn")!;
+
+        cards.forEach((card) => {
+            card.addEventListener("click", () => {
+                cards.forEach((c) => c.classList.remove("selected"));
+                card.classList.add("selected");
+                selected = card.getAttribute("data-method") as SigningMethod;
+                hdPathGroup.style.display = selected === "sign-with-ledger" ? "block" : "none";
+            });
+        });
+
+        btn.addEventListener("click", () => {
+            const result: SigningPreference = { signingMethod: selected };
+            if (selected === "sign-with-ledger") {
+                const hdPath = hdPathInput.value.trim();
+                if (!hdPath) {
+                    showError(root, "Please enter an HD derivation path");
+                    return;
+                }
+                result.ledgerHdPath = hdPath;
+            }
+            resolve(result);
         });
     });
 }
@@ -297,14 +371,25 @@ class NearCliWallet {
         }
 
         const needsAccountId = !existingAccountId;
+        let totalSteps = 2; // account ID + signing method
+        if (contractId) totalSteps++; // add-key step
+        let currentStep = 0;
+
         const accountId =
             existingAccountId ||
             (await promptAccountId({
                 title: "Connect with NEAR CLI",
                 subtitle: "Enter your NEAR account ID",
-                buttonText: contractId ? "Next" : "Connect",
-                step: contractId && needsAccountId ? "Step 1 of 2" : undefined,
+                buttonText: "Next",
+                step: needsAccountId ? `Step ${++currentStep} of ${totalSteps}` : undefined,
             }));
+        if (!needsAccountId) currentStep++;
+
+        const { signingMethod, ledgerHdPath } = await promptSigningMethod({
+            step: `Step ${++currentStep} of ${totalSteps}`,
+        });
+        await setStoredSigningMethod(network, signingMethod);
+        if (ledgerHdPath) await setStoredLedgerHdPath(network, ledgerHdPath);
 
         if (contractId) {
             const keyPair = KeyPair.fromRandom("ed25519");
@@ -316,11 +401,13 @@ class NearCliWallet {
                 contractId,
                 methodNames,
                 network,
+                signingMethod,
+                ledgerHdPath,
             });
 
             const rpcUrl = getRpcUrl(network);
             await promptHashAndVerify(
-                addKeyCommandHtml(command, needsAccountId ? "Step 2 of 2" : undefined),
+                addKeyCommandHtml(command, `Step ${++currentStep} of ${totalSteps}`),
                 rpcUrl,
                 accountId,
             );
@@ -348,7 +435,7 @@ class NearCliWallet {
         const needsAccountId = !existingAccountId;
         const needsAddKey = contractId && existingKey?.contractId !== contractId;
 
-        let totalSteps = 1;
+        let totalSteps = 2; // signing method + sign message
         if (needsAccountId) totalSteps++;
         if (needsAddKey) totalSteps++;
         let currentStep = 0;
@@ -361,6 +448,13 @@ class NearCliWallet {
                 buttonText: "Next",
                 step: `Step ${++currentStep} of ${totalSteps}`,
             }));
+        if (!needsAccountId) currentStep++;
+
+        const { signingMethod, ledgerHdPath } = await promptSigningMethod({
+            step: `Step ${++currentStep} of ${totalSteps}`,
+        });
+        await setStoredSigningMethod(network, signingMethod);
+        if (ledgerHdPath) await setStoredLedgerHdPath(network, ledgerHdPath);
 
         const nonceBase64 = Buffer.from(nonce).toString("base64");
         const command = buildSignMessageCommand({
@@ -369,6 +463,8 @@ class NearCliWallet {
             nonce: nonceBase64,
             network,
             signerId: accountId,
+            signingMethod,
+            ledgerHdPath,
         });
 
         const output = await promptSignMessageOutput(command, `Step ${++currentStep} of ${totalSteps}`);
@@ -384,6 +480,8 @@ class NearCliWallet {
                 contractId,
                 methodNames,
                 network,
+                signingMethod,
+                ledgerHdPath,
             });
 
             const rpcUrl = getRpcUrl(network);
@@ -419,6 +517,8 @@ class NearCliWallet {
     signOut = async ({ network }: { network: string }) => {
         await removeStoredAccountId(network);
         await removeStoredFunctionCallKey(network);
+        await removeStoredSigningMethod(network);
+        await removeStoredLedgerHdPath(network);
     };
 
     getAccounts = async ({ network }: { network: string }) => {
@@ -445,11 +545,16 @@ class NearCliWallet {
         const accountId = await getStoredAccountId(network);
         if (!accountId) throw new Error("Wallet not signed in");
 
+        const signingMethod = await getStoredSigningMethod(network);
+        const ledgerHdPath = signingMethod === "sign-with-ledger" ? await getStoredLedgerHdPath(network) : undefined;
+
         const command = buildTransactionCommand({
             signerId: accountId,
             receiverId,
             actions,
             network: network as Network,
+            signingMethod,
+            ledgerHdPath,
         });
 
         try {
@@ -470,6 +575,9 @@ class NearCliWallet {
         const accountId = await getStoredAccountId(network);
         if (!accountId) throw new Error("Wallet not signed in");
 
+        const signingMethod = await getStoredSigningMethod(network);
+        const ledgerHdPath = signingMethod === "sign-with-ledger" ? await getStoredLedgerHdPath(network) : undefined;
+
         const rpcUrl = getRpcUrl(network);
         const results: any[] = [];
 
@@ -480,6 +588,8 @@ class NearCliWallet {
                     receiverId: tx.receiverId,
                     actions: tx.actions,
                     network: network as Network,
+                    signingMethod,
+                    ledgerHdPath,
                 });
 
                 const result = await promptHashAndVerify(transactionCommandHtml(command), rpcUrl, accountId);
@@ -496,6 +606,9 @@ class NearCliWallet {
         const accountId = await getStoredAccountId(network);
         if (!accountId) throw new Error("Wallet not signed in");
 
+        const signingMethod = await getStoredSigningMethod(network);
+        const ledgerHdPath = signingMethod === "sign-with-ledger" ? await getStoredLedgerHdPath(network) : undefined;
+
         const nonceBase64 = Buffer.from(nonce).toString("base64");
         const command = buildSignMessageCommand({
             message,
@@ -503,6 +616,8 @@ class NearCliWallet {
             nonce: nonceBase64,
             network,
             signerId: accountId,
+            signingMethod,
+            ledgerHdPath,
         });
 
         try {
@@ -527,6 +642,9 @@ class NearCliWallet {
         const accountId = await getStoredAccountId(network);
         if (!accountId) throw new Error("Wallet not signed in");
 
+        const signingMethod = await getStoredSigningMethod(network);
+        const ledgerHdPath = signingMethod === "sign-with-ledger" ? await getStoredLedgerHdPath(network) : undefined;
+
         const signedDelegateActions: string[] = [];
 
         try {
@@ -538,6 +656,8 @@ class NearCliWallet {
                     receiverId: da.receiverId,
                     actions: da.actions,
                     network: network as Network,
+                    signingMethod,
+                    ledgerHdPath,
                 });
 
                 const step = total > 1 ? `Step ${i + 1} of ${total}` : undefined;
