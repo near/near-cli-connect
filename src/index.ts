@@ -1,4 +1,3 @@
-import { KeyPair } from "@near-js/crypto";
 import { baseDecode } from "@near-js/utils";
 
 import { ConnectorAction } from "./action";
@@ -10,6 +9,7 @@ import {
     Network,
     SigningMethod,
     DEFAULT_LEDGER_HD_PATH,
+    AddFunctionCallKeyParams,
 } from "./commands";
 import {
     headHtml,
@@ -21,10 +21,9 @@ import {
     signingMethodSelectorHtml,
 } from "./view";
 
-interface FunctionCallKey {
-    privateKey: string;
+interface StoredFunctionCallKey {
+    publicKey: string;
     contractId: string;
-    methods: string[];
 }
 
 const storage = () => window.selector.storage;
@@ -41,12 +40,12 @@ async function removeStoredAccountId(network: string): Promise<void> {
     await storage().remove(`cli:${network}:accountId`);
 }
 
-async function getStoredFunctionCallKey(network: string): Promise<FunctionCallKey | null> {
+async function getStoredFunctionCallKey(network: string): Promise<StoredFunctionCallKey | null> {
     const raw = await storage().get(`cli:${network}:functionCallKey`);
     return raw ? JSON.parse(raw) : null;
 }
 
-async function setStoredFunctionCallKey(network: string, key: FunctionCallKey): Promise<void> {
+async function setStoredFunctionCallKey(network: string, key: StoredFunctionCallKey): Promise<void> {
     await storage().set(`cli:${network}:functionCallKey`, JSON.stringify(key));
 }
 
@@ -361,23 +360,24 @@ function promptDelegateActionOutput(command: string, step?: string): Promise<str
 }
 
 class NearCliWallet {
-    signIn = async ({ contractId, methodNames, network }: any) => {
+    signIn = async ({
+        addFunctionCallKey,
+        network,
+    }: {
+        addFunctionCallKey?: AddFunctionCallKeyParams;
+        network: string;
+    }) => {
         const existingAccountId = await getStoredAccountId(network);
         const existingKey = await getStoredFunctionCallKey(network);
 
-        if (existingAccountId && (!contractId || existingKey?.contractId === contractId)) {
-            const publicKey = existingKey
-                ? KeyPair.fromString(existingKey.privateKey as any)
-                      .getPublicKey()
-                      .toString()
-                : "";
-            return [{ accountId: existingAccountId, publicKey }];
+        if (existingAccountId && (!addFunctionCallKey || existingKey?.contractId === addFunctionCallKey.contractId)) {
+            return [{ accountId: existingAccountId, publicKey: existingKey?.publicKey ?? "" }];
         }
 
         const needsAccountId = !existingAccountId;
         let totalSteps = 1; // signing method
         if (needsAccountId) totalSteps++;
-        if (contractId) totalSteps++;
+        if (addFunctionCallKey) totalSteps++;
         let currentStep = 0;
 
         const accountId =
@@ -395,16 +395,13 @@ class NearCliWallet {
         await setStoredSigningMethod(network, signingMethod);
         if (ledgerHdPath) await setStoredLedgerHdPath(network, ledgerHdPath);
 
-        if (contractId) {
-            const keyPair = KeyPair.fromRandom("ed25519");
-            const publicKey = keyPair.getPublicKey().toString();
+        if (addFunctionCallKey) {
+            const { publicKey } = addFunctionCallKey;
 
             const command = buildAddKeyCommand({
                 accountId,
-                publicKey,
-                contractId,
-                methodNames,
-                network,
+                addFunctionCallKey,
+                network: network as Network,
                 signingMethod,
                 ledgerHdPath,
             });
@@ -416,13 +413,12 @@ class NearCliWallet {
                 accountId,
             );
 
-            const fcKey: FunctionCallKey = {
-                privateKey: keyPair.toString(),
-                contractId,
-                methods: methodNames || [],
+            const storedKey: StoredFunctionCallKey = {
+                publicKey,
+                contractId: addFunctionCallKey.contractId,
             };
             await setStoredAccountId(network, accountId);
-            await setStoredFunctionCallKey(network, fcKey);
+            await setStoredFunctionCallKey(network, storedKey);
 
             return [{ accountId, publicKey }];
         }
@@ -431,13 +427,21 @@ class NearCliWallet {
         return [{ accountId, publicKey: "" }];
     };
 
-    signInAndSignMessage = async ({ contractId, methodNames, network, messageParams }: any) => {
+    signInAndSignMessage = async ({
+        addFunctionCallKey,
+        network,
+        messageParams,
+    }: {
+        addFunctionCallKey?: AddFunctionCallKeyParams;
+        network: Network;
+        messageParams: any;
+    }) => {
         const { message, recipient, nonce } = messageParams;
         const existingAccountId = await getStoredAccountId(network);
         const existingKey = await getStoredFunctionCallKey(network);
 
         const needsAccountId = !existingAccountId;
-        const needsAddKey = contractId && existingKey?.contractId !== contractId;
+        const needsAddKey = addFunctionCallKey && existingKey?.contractId !== addFunctionCallKey.contractId;
 
         let totalSteps = 2; // signing method + sign message
         if (needsAccountId) totalSteps++;
@@ -473,16 +477,13 @@ class NearCliWallet {
         const output = await promptSignMessageOutput(command, `Step ${++currentStep} of ${totalSteps}`);
 
         let publicKey = output.publicKey;
-        if (needsAddKey) {
-            const keyPair = KeyPair.fromRandom("ed25519");
-            publicKey = keyPair.getPublicKey().toString();
+        if (needsAddKey && addFunctionCallKey) {
+            publicKey = addFunctionCallKey.publicKey;
 
             const addKeyCmd = buildAddKeyCommand({
                 accountId,
-                publicKey,
-                contractId,
-                methodNames,
-                network,
+                addFunctionCallKey,
+                network: network as Network,
                 signingMethod,
                 ledgerHdPath,
             });
@@ -494,12 +495,11 @@ class NearCliWallet {
                 accountId,
             );
 
-            const fcKey: FunctionCallKey = {
-                privateKey: keyPair.toString(),
-                contractId,
-                methods: methodNames || [],
+            const storedKey: StoredFunctionCallKey = {
+                publicKey: addFunctionCallKey.publicKey,
+                contractId: addFunctionCallKey.contractId,
             };
-            await setStoredFunctionCallKey(network, fcKey);
+            await setStoredFunctionCallKey(network, storedKey);
         }
 
         await setStoredAccountId(network, accountId);
@@ -528,12 +528,7 @@ class NearCliWallet {
         const accountId = await getStoredAccountId(network);
         if (!accountId) return [];
         const fcKey = await getStoredFunctionCallKey(network);
-        const publicKey = fcKey
-            ? KeyPair.fromString(fcKey.privateKey as any)
-                  .getPublicKey()
-                  .toString()
-            : "";
-        return [{ accountId, publicKey }];
+        return [{ accountId, publicKey: fcKey?.publicKey ?? "" }];
     };
 
     signAndSendTransaction = async ({
