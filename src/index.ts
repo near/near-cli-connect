@@ -370,7 +370,13 @@ class NearCliWallet {
         const existingAccountId = await getStoredAccountId(network);
         const existingKey = await getStoredFunctionCallKey(network);
 
-        if (existingAccountId && (!addFunctionCallKey || existingKey?.contractId === addFunctionCallKey.contractId)) {
+        const hasMatchingKey =
+            existingKey?.publicKey &&
+            (!addFunctionCallKey ||
+                (existingKey.contractId === addFunctionCallKey.contractId &&
+                    existingKey.publicKey === addFunctionCallKey.publicKey));
+
+        if (existingAccountId && (!addFunctionCallKey || hasMatchingKey)) {
             return [{ accountId: existingAccountId, publicKey: existingKey?.publicKey ?? "" }];
         }
 
@@ -441,7 +447,11 @@ class NearCliWallet {
         const existingKey = await getStoredFunctionCallKey(network);
 
         const needsAccountId = !existingAccountId;
-        const needsAddKey = addFunctionCallKey && existingKey?.contractId !== addFunctionCallKey.contractId;
+        const needsAddKey =
+            !!addFunctionCallKey &&
+            (!existingKey?.publicKey ||
+                existingKey.contractId !== addFunctionCallKey.contractId ||
+                existingKey.publicKey !== addFunctionCallKey.publicKey);
 
         let totalSteps = 2; // signing method + sign message
         if (needsAccountId) totalSteps++;

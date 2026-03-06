@@ -78,9 +78,9 @@ export function buildAddKeyCommand({
     parts.push(`--allowance ${allowanceArg}`);
     parts.push(`--contract-account-id '${shellEscape(contractId)}'`);
 
-    if (allowMethods.anyMethod) {
+    if (allowMethods.anyMethod || allowMethods.methodNames.length === 0) {
         parts.push(`--function-names ''`);
-    } else if (allowMethods.methodNames.length > 0) {
+    } else {
         parts.push(`--function-names '${shellEscape(allowMethods.methodNames.join(", "))}'`);
     }
 
