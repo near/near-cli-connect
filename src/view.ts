@@ -284,7 +284,7 @@ export function accountIdInputHtml(opts: {
       <h2>${escapeHtml(opts.title)}</h2>
       ${opts.subtitle ? `<p class="subtitle">${escapeHtml(opts.subtitle)}</p>` : ""}
       <div class="field-group">
-        <input type="text" id="account-id" placeholder="e.g. yourname.near" autocomplete="off" spellcheck="false" />
+        <input type="text" id="account-id" placeholder="e.g. yourname.near" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="submit-btn">${escapeHtml(opts.buttonText)}</button>
@@ -301,7 +301,7 @@ export function addKeyCommandHtml(command: string, step?: string): string {
       ${commandBlockHtml(command)}
       <div class="field-group">
         <label class="field-label">Transaction hash or explorer URL</label>
-        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocomplete="off" spellcheck="false" />
+        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="verify-btn">Verify</button>
@@ -317,7 +317,7 @@ export function transactionCommandHtml(command: string): string {
       ${commandBlockHtml(command)}
       <div class="field-group">
         <label class="field-label">Transaction hash or explorer URL</label>
-        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocomplete="off" spellcheck="false" />
+        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="verify-btn">Verify</button>
@@ -379,7 +379,7 @@ export function signingMethodSelectorHtml(opts: { step?: string; defaultHdPath: 
       </div>
       <div class="hd-path-group" id="hd-path-group" style="display:none">
         <label class="field-label">HD derivation path</label>
-        <input type="text" id="hd-path" value="${escapeHtml(opts.defaultHdPath)}" autocomplete="off" spellcheck="false" />
+        <input type="text" id="hd-path" value="${escapeHtml(opts.defaultHdPath)}" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="submit-signing-method-btn">Continue</button>

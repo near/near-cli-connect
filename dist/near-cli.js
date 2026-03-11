@@ -285,7 +285,7 @@ button.signing-method-card {
       <h2>${Q(o.title)}</h2>
       ${o.subtitle?`<p class="subtitle">${Q(o.subtitle)}</p>`:""}
       <div class="field-group">
-        <input type="text" id="account-id" placeholder="e.g. yourname.near" autocomplete="off" spellcheck="false" />
+        <input type="text" id="account-id" placeholder="e.g. yourname.near" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="submit-btn">${Q(o.buttonText)}</button>
@@ -298,7 +298,7 @@ button.signing-method-card {
       ${$t(o)}
       <div class="field-group">
         <label class="field-label">Transaction hash or explorer URL</label>
-        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocomplete="off" spellcheck="false" />
+        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="verify-btn">Verify</button>
@@ -310,7 +310,7 @@ button.signing-method-card {
       ${$t(o)}
       <div class="field-group">
         <label class="field-label">Transaction hash or explorer URL</label>
-        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocomplete="off" spellcheck="false" />
+        <input type="text" id="tx-hash" placeholder="Paste transaction hash or explorer URL" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="verify-btn">Verify</button>
@@ -360,7 +360,7 @@ button.signing-method-card {
       </div>
       <div class="hd-path-group" id="hd-path-group" style="display:none">
         <label class="field-label">HD derivation path</label>
-        <input type="text" id="hd-path" value="${Q(o.defaultHdPath)}" autocomplete="off" spellcheck="false" />
+        <input type="text" id="hd-path" value="${Q(o.defaultHdPath)}" autocapitalize="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="error" class="error-text" style="display:none"></div>
       <button class="btn" id="submit-signing-method-btn">Continue</button>
