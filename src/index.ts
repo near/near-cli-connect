@@ -169,6 +169,7 @@ function promptAccountId(opts: {
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") submit();
         });
+        requestAnimationFrame(() => input.focus());
     });
 }
 
@@ -244,6 +245,16 @@ function promptSigningMethod(opts: { step?: string }): Promise<SigningPreference
         }
 
         btn.addEventListener("click", submit);
+
+        root.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && document.activeElement !== hdPathInput) {
+                e.preventDefault();
+                submit();
+            }
+        });
+
+        const selectedCard = root.querySelector<HTMLElement>(".signing-method-card.selected");
+        if (selectedCard) requestAnimationFrame(() => selectedCard.focus());
     });
 }
 

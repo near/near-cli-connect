@@ -195,6 +195,7 @@ button.signing-method-card {
   color: inherit;
   -webkit-appearance: none;
   appearance: none;
+  outline: none;
 }
 
 .signing-method-card {
