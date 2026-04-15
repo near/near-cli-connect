@@ -347,7 +347,7 @@ export function delegateActionCommandHtml(command: string, step?: string): strin
     <div class="container">
       ${step ? `<div class="step-indicator">${escapeHtml(step)}</div>` : ""}
       <h2>Sign delegate action</h2>
-      <p class="subtitle">Run this command in your terminal (requires near-cli-rs &ge; 0.24.0), then paste the base64 output below</p>
+      <p class="subtitle">Run this command in your terminal, then paste the base64 output below</p>
       ${commandBlockHtml(command)}
       <div class="field-group">
         <label class="field-label">Signed delegate action (base64)</label>

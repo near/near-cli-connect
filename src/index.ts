@@ -194,20 +194,43 @@ function promptSigningMethod(opts: { step?: string }): Promise<SigningPreference
         const hdPathInput = root.querySelector<HTMLInputElement>("#hd-path")!;
         const btn = root.querySelector<HTMLButtonElement>("#submit-signing-method-btn")!;
 
+        function selectCard(card: HTMLElement) {
+            cards.forEach((c) => {
+                c.classList.remove("selected");
+                c.setAttribute("aria-pressed", "false");
+            });
+            card.classList.add("selected");
+            card.setAttribute("aria-pressed", "true");
+            selected = card.getAttribute("data-method") as SigningMethod;
+            hdPathGroup.style.display = selected === "sign-with-ledger" ? "block" : "none";
+        }
+
+        const cardsArray = Array.from(cards);
+
         cards.forEach((card) => {
-            card.addEventListener("click", () => {
-                cards.forEach((c) => {
-                    c.classList.remove("selected");
-                    c.setAttribute("aria-pressed", "false");
-                });
-                card.classList.add("selected");
-                card.setAttribute("aria-pressed", "true");
-                selected = card.getAttribute("data-method") as SigningMethod;
-                hdPathGroup.style.display = selected === "sign-with-ledger" ? "block" : "none";
+            card.addEventListener("click", () => selectCard(card));
+            card.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                    return;
+                }
+                const idx = cardsArray.indexOf(card);
+                if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    const next = cardsArray[(idx + 1) % cardsArray.length];
+                    selectCard(next);
+                    next.focus();
+                } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    const prev = cardsArray[(idx - 1 + cardsArray.length) % cardsArray.length];
+                    selectCard(prev);
+                    prev.focus();
+                }
             });
         });
 
-        btn.addEventListener("click", () => {
+        function submit() {
             const result: SigningPreference = { signingMethod: selected };
             if (selected === "sign-with-ledger") {
                 const hdPath = hdPathInput.value.trim();
@@ -218,7 +241,9 @@ function promptSigningMethod(opts: { step?: string }): Promise<SigningPreference
                 result.ledgerHdPath = hdPath;
             }
             resolve(result);
-        });
+        }
+
+        btn.addEventListener("click", submit);
     });
 }
 
