@@ -113,22 +113,25 @@ function renderPage(html: string): HTMLElement {
 
 function clickCopyButton(btn: HTMLButtonElement): void {
     const command = btn.getAttribute("data-command") || "";
-    navigator.clipboard.writeText(command).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-            btn.textContent = orig;
-        }, 1500);
-    }).catch(() => {
-        const code = btn.parentElement?.querySelector("code");
-        if (code) {
-            const range = document.createRange();
-            range.selectNodeContents(code);
-            const sel = window.getSelection();
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-        }
-    });
+    navigator.clipboard
+        .writeText(command)
+        .then(() => {
+            const orig = btn.textContent;
+            btn.textContent = "Copied!";
+            setTimeout(() => {
+                btn.textContent = orig;
+            }, 1500);
+        })
+        .catch(() => {
+            const code = btn.parentElement?.querySelector("code");
+            if (code) {
+                const range = document.createRange();
+                range.selectNodeContents(code);
+                const sel = window.getSelection();
+                sel?.removeAllRanges();
+                sel?.addRange(range);
+            }
+        });
 }
 
 function setupCopyButtons(root: HTMLElement): void {
