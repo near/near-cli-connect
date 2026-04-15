@@ -107,31 +107,43 @@ function renderPage(html: string): HTMLElement {
     root.style.height = "100%";
     root.innerHTML = html;
     document.body.appendChild(root);
+    window.focus();
     return root;
 }
 
+function clickCopyButton(btn: HTMLButtonElement): void {
+    const command = btn.getAttribute("data-command") || "";
+    navigator.clipboard.writeText(command).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => {
+            btn.textContent = orig;
+        }, 1500);
+    }).catch(() => {
+        const code = btn.parentElement?.querySelector("code");
+        if (code) {
+            const range = document.createRange();
+            range.selectNodeContents(code);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+        }
+    });
+}
+
 function setupCopyButtons(root: HTMLElement): void {
-    root.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-            const command = btn.getAttribute("data-command") || "";
-            try {
-                await navigator.clipboard.writeText(command);
-                const orig = btn.textContent;
-                btn.textContent = "Copied!";
-                setTimeout(() => {
-                    btn.textContent = orig;
-                }, 1500);
-            } catch {
-                const code = btn.parentElement?.querySelector("code");
-                if (code) {
-                    const range = document.createRange();
-                    range.selectNodeContents(code);
-                    const sel = window.getSelection();
-                    sel?.removeAllRanges();
-                    sel?.addRange(range);
-                }
-            }
-        });
+    const copyBtns = root.querySelectorAll<HTMLButtonElement>(".copy-btn");
+    copyBtns.forEach((btn) => {
+        btn.addEventListener("click", () => clickCopyButton(btn));
+    });
+
+    document.addEventListener("keydown", (e) => {
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+        if (e.key === "c" && copyBtns.length > 0) {
+            e.preventDefault();
+            clickCopyButton(copyBtns[0]);
+        }
     });
 }
 
