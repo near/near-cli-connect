@@ -259,7 +259,7 @@ export function buildMetaTransactionCommand({
         ...actionParts,
         "skip",
         `network-config ${network}`,
-        `${signingPart(signingMethod, ledgerHdPath)} display`,
+        `${signingPart(signingMethod, ledgerHdPath)}`,
     ].join(" \\\n    ");
 }
 
