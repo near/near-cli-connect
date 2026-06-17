@@ -36,6 +36,29 @@ function shellEscape(s: string): string {
     return s.replace(/'/g, "'\\''");
 }
 
+function asBytes(args: unknown): Uint8Array | null {
+    if (args instanceof Uint8Array) return args;
+    if (args instanceof ArrayBuffer) return new Uint8Array(args);
+    if (ArrayBuffer.isView(args)) {
+        const v = args as ArrayBufferView;
+        return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    }
+    return null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+    let s = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    return btoa(s);
+}
+
+function functionArgsPart(args: object | Uint8Array): string {
+    const bytes = asBytes(args);
+    if (bytes) return `base64-args '${bytesToBase64(bytes)}'`;
+    return `json-args '${shellEscape(JSON.stringify(args))}'`;
+}
+
 export interface AddFunctionCallKeyParams {
     contractId: string;
     publicKey: string;
@@ -100,10 +123,9 @@ function buildActionPart(action: ConnectorAction): string {
             return `add-action transfer '${yoctoToNear(action.params.deposit)} NEAR'`;
 
         case "FunctionCall": {
-            const args = JSON.stringify(action.params.args);
             return [
                 `add-action function-call '${shellEscape(action.params.methodName)}'`,
-                `json-args '${shellEscape(args)}'`,
+                functionArgsPart(action.params.args),
                 `prepaid-gas '${gasToTgas(action.params.gas)} Tgas'`,
                 `attached-deposit '${yoctoToNear(action.params.deposit)} NEAR'`,
             ].join(" ");
@@ -171,12 +193,11 @@ export function buildTransactionCommand({
 
     if (actions.length === 1 && actions[0].type === "FunctionCall") {
         const fc = actions[0].params;
-        const args = JSON.stringify(fc.args);
         return [
             "near contract",
             "call-function",
             `as-transaction '${shellEscape(receiverId)}' '${shellEscape(fc.methodName)}'`,
-            `json-args '${shellEscape(args)}'`,
+            functionArgsPart(fc.args),
             `prepaid-gas '${gasToTgas(fc.gas)} Tgas'`,
             `attached-deposit '${yoctoToNear(fc.deposit)} NEAR'`,
             `sign-as '${shellEscape(signerId)}'`,
