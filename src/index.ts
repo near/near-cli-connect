@@ -1,4 +1,4 @@
-import { baseDecode } from "@near-js/utils";
+import { base58 } from "@scure/base";
 
 import { ConnectorAction } from "./action";
 import {
@@ -359,7 +359,7 @@ function signatureToBase64(signature: string, publicKey: string): string {
         throw new Error(`Signature type "${sigType}" does not match public key type "${keyType}"`);
     }
 
-    const bytes = baseDecode(sigData);
+    const bytes = base58.decode(sigData);
     if (bytes.length !== expectedLength) {
         throw new Error(`Invalid ${sigType} signature: expected ${expectedLength} bytes, got ${bytes.length}`);
     }
