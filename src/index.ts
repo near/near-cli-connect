@@ -1,4 +1,4 @@
-import { baseDecode } from "@near-js/utils";
+import { base58 } from "@scure/base";
 
 import { ConnectorAction } from "./action";
 import {
@@ -336,6 +336,36 @@ interface SignMessageOutput {
     signature: string;
 }
 
+/** NEAR key types and their raw signature sizes in bytes. */
+const SIGNATURE_LENGTHS: Record<string, number> = {
+    ed25519: 64,
+    secp256k1: 65,
+    "ml-dsa-65": 3309,
+};
+
+/**
+ * Convert near-cli's `<key type>:<base58>` signature into the raw base64
+ * signature near-connect expects. The key type must match the public key's.
+ */
+function signatureToBase64(signature: string, publicKey: string): string {
+    const keyType = publicKey.includes(":") ? publicKey.split(":")[0] : "ed25519";
+    const [sigType, sigData] = signature.includes(":")
+        ? [signature.slice(0, signature.indexOf(":")), signature.slice(signature.indexOf(":") + 1)]
+        : [keyType, signature];
+
+    const expectedLength = SIGNATURE_LENGTHS[sigType];
+    if (expectedLength === undefined) throw new Error(`Unsupported signature type "${sigType}"`);
+    if (sigType !== keyType) {
+        throw new Error(`Signature type "${sigType}" does not match public key type "${keyType}"`);
+    }
+
+    const bytes = base58.decode(sigData);
+    if (bytes.length !== expectedLength) {
+        throw new Error(`Invalid ${sigType} signature: expected ${expectedLength} bytes, got ${bytes.length}`);
+    }
+    return Buffer.from(bytes).toString("base64");
+}
+
 function promptSignMessageOutput(command: string, step?: string): Promise<SignMessageOutput> {
     return new Promise((resolve) => {
         const root = renderPage(signMessageCommandHtml(command, step));
@@ -361,11 +391,10 @@ function promptSignMessageOutput(command: string, step?: string): Promise<SignMe
                     throw new Error("Missing signature or publicKey in output");
                 }
 
-                const sigData = parsed.signature.replace(/^ed25519:/, "");
                 resolve({
                     accountId: parsed.accountId || "",
                     publicKey: parsed.publicKey,
-                    signature: Buffer.from(baseDecode(sigData)).toString("base64"),
+                    signature: signatureToBase64(parsed.signature, parsed.publicKey),
                 });
             } catch (err: any) {
                 showError(root, `Could not parse output: ${err.message}`);
